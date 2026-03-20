@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 // ════════════════════════════════════════════════════════════
 //  TYPES
@@ -47,11 +47,11 @@ const TRAIN_DATA: TrainSample[] = [
 ];
 
 // SVG layout
-const SVG_W = 700, SVG_H = 420;
+const SVG_W = 700, SVG_H = 460;
 const INPUT_X = 80, HIDDEN_X = 290, OUTPUT_X = 560;
 const INPUT_YS  = [70, 210, 350];
-const HIDDEN_YS = [60, 170, 280, 380];
-const OUTPUT_YS = [60, 170, 280, 380];
+const HIDDEN_YS = [46, 138, 230, 322, 414];
+const OUTPUT_YS = [70, 185, 300, 400];
 
 // ════════════════════════════════════════════════════════════
 //  MATH
@@ -68,27 +68,25 @@ function softmax(arr: number[]): number[] {
   const s  = ex.reduce((a, b) => a + b, 0);
   return ex.map(v => v / s);
 }
-function rnd(): number { return (Math.random() - 0.5) * 1.4; }
-
-// Pre-trained weights that correctly classify all 4 fruits from the start
+// Pre-trained weights — 5 hidden nodes, 4 outputs, 100% accuracy on all presets
 // Inputs: [yellow, red, rough]
-// h0 activates with HIGH RED       -> favors apple / strawberry
-// h1 activates with YELLOW+ROUGH   -> favors orange
-// h2 activates with YELLOW+SMOOTH  -> favors banana
-// h3 activates with MED RED+SMOOTH -> favors strawberry
+// h0: yellow detector        h1: red detector
+// h2: rough detector         h3: smooth detector (NOT rough)
+// h4: red+rough combined     -> key to separate apple vs strawberry
 
 const PRETRAINED_HIDDEN: Array<{ bias: number; weights: [number,number,number] }> = [
-  { bias: -0.8, weights: [-1.2,  2.8, -1.0] },
-  { bias: -1.0, weights: [ 2.5, -1.2,  2.2] },
-  { bias: -0.7, weights: [ 2.2, -0.5, -1.5] },
-  { bias: -0.6, weights: [-0.4,  1.8, -0.3] },
+  { bias: -1.5, weights: [ 3.5, -0.5, -0.5] },  // h0: yellow
+  { bias: -1.5, weights: [-0.5,  3.5, -0.5] },  // h1: red
+  { bias: -1.5, weights: [-0.5, -0.5,  3.5] },  // h2: rough
+  { bias:  2.2, weights: [-0.5, -0.5, -5.0] },  // h3: smooth
+  { bias: -4.5, weights: [-0.5,  4.0,  4.0] },  // h4: red+rough
 ];
 
-const PRETRAINED_OUTPUT: Array<{ bias: number; weights: [number,number,number,number] }> = [
-  { bias: -0.5, weights: [ 3.0, -2.0, -1.5,  1.5] },  // apple
-  { bias: -0.5, weights: [-2.0,  3.2, -1.5, -1.0] },  // orange
-  { bias: -0.5, weights: [-2.0, -1.5,  3.5, -1.5] },  // banana
-  { bias: -0.5, weights: [ 1.2, -2.0, -1.8,  2.8] },  // strawberry
+const PRETRAINED_OUTPUT: Array<{ bias: number; weights: [number,number,number,number,number] }> = [
+  { bias: -1.0, weights: [-1.5,  2.5, -2.5,  4.5, -5.0] },  // apple:      red+smooth
+  { bias: -1.0, weights: [ 4.0, -1.5,  3.0, -2.0, -3.5] },  // orange:     yellow+rough
+  { bias: -1.0, weights: [ 3.0, -1.5, -2.0,  3.0, -2.5] },  // banana:     yellow+smooth
+  { bias: -1.0, weights: [-2.0,  1.5, -1.5, -3.5,  6.5] },  // strawberry: red+rough
 ];
 
 function initNetwork() {
