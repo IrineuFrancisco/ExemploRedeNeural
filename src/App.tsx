@@ -46,7 +46,7 @@ const TRAIN_DATA: TrainSample[] = [
   { inputs: { yellow: 0.1, red: 0.9, rough: 0.4 }, label: "strawberry" },
 ];
 
-// SVG layout
+// SVG layout — 5 hidden nodes
 const SVG_W = 700, SVG_H = 460;
 const INPUT_X = 80, HIDDEN_X = 290, OUTPUT_X = 560;
 const INPUT_YS  = [70, 210, 350];
@@ -68,13 +68,17 @@ function softmax(arr: number[]): number[] {
   const s  = ex.reduce((a, b) => a + b, 0);
   return ex.map(v => v / s);
 }
-// Pre-trained weights — 5 hidden nodes, 4 outputs, 100% accuracy on all presets
-// Inputs: [yellow, red, rough]
-// h0: yellow detector        h1: red detector
-// h2: rough detector         h3: smooth detector (NOT rough)
-// h4: red+rough combined     -> key to separate apple vs strawberry
 
-const PRETRAINED_HIDDEN: Array<{ bias: number; weights: [number,number,number] }> = [
+// ════════════════════════════════════════════════════════════
+//  PRE-TRAINED WEIGHTS (100% accuracy on all presets)
+//  Inputs: [yellow, red, rough]
+//  h0: yellow detector        → Laranja / Banana
+//  h1: red detector           → Maçã / Morango
+//  h2: rough detector         → Laranja / Morango
+//  h3: smooth detector        → Maçã / Banana
+//  h4: red+rough combined     → distingue Morango de Maçã
+// ════════════════════════════════════════════════════════════
+const PRETRAINED_HIDDEN: Array<{ bias: number; weights: [number, number, number] }> = [
   { bias: -1.5, weights: [ 3.5, -0.5, -0.5] },  // h0: yellow
   { bias: -1.5, weights: [-0.5,  3.5, -0.5] },  // h1: red
   { bias: -1.5, weights: [-0.5, -0.5,  3.5] },  // h2: rough
@@ -82,13 +86,16 @@ const PRETRAINED_HIDDEN: Array<{ bias: number; weights: [number,number,number] }
   { bias: -4.5, weights: [-0.5,  4.0,  4.0] },  // h4: red+rough
 ];
 
-const PRETRAINED_OUTPUT: Array<{ bias: number; weights: [number,number,number,number,number] }> = [
-  { bias: -1.0, weights: [-1.5,  2.5, -2.5,  4.5, -5.0] },  // apple:      red+smooth
-  { bias: -1.0, weights: [ 4.0, -1.5,  3.0, -2.0, -3.5] },  // orange:     yellow+rough
-  { bias: -1.0, weights: [ 3.0, -1.5, -2.0,  3.0, -2.5] },  // banana:     yellow+smooth
-  { bias: -1.0, weights: [-2.0,  1.5, -1.5, -3.5,  6.5] },  // strawberry: red+rough
+const PRETRAINED_OUTPUT: Array<{ bias: number; weights: [number, number, number, number, number] }> = [
+  { bias: -1.0, weights: [-1.5,  2.5, -2.5,  4.5, -5.0] },  // apple:      red + smooth
+  { bias: -1.0, weights: [ 4.0, -1.5,  3.0, -2.0, -3.5] },  // orange:     yellow + rough
+  { bias: -1.0, weights: [ 3.0, -1.5, -2.0,  3.0, -2.5] },  // banana:     yellow + smooth
+  { bias: -1.0, weights: [-2.0,  1.5, -1.5, -3.5,  6.5] },  // strawberry: red + rough
 ];
 
+// ════════════════════════════════════════════════════════════
+//  NETWORK
+// ════════════════════════════════════════════════════════════
 function initNetwork() {
   const hidden: HiddenNode[] = PRETRAINED_HIDDEN.map((p, i) => ({
     id: `h${i}`, bias: p.bias, weights: [...p.weights],
@@ -116,7 +123,7 @@ function trainStep(
   hidden: HiddenNode[], outputs: FruitOutputNode[], lr: number
 ) {
   const { hiddenAct, outputAct } = forward(inp, hidden, outputs);
-  const loss = -Math.log(Math.max(outputAct[targetIdx], 1e-9));
+  const loss  = -Math.log(Math.max(outputAct[targetIdx], 1e-9));
   const dOut  = outputAct.map((a, i) => a - (i === targetIdx ? 1 : 0));
 
   const newOutputs: FruitOutputNode[] = outputs.map((o, oi) => ({
@@ -150,10 +157,11 @@ interface NetCanvasProps {
   hiddenActs: number[];
   outputActs: number[];
 }
+
 function NetCanvas({ hiddenNodes, outputNodes, inputVals, hiddenActs, outputActs }: NetCanvasProps) {
   const ihLines = INPUT_YS.flatMap((iy, ii) =>
     HIDDEN_YS.map((hy, hi) => {
-      const w = hiddenNodes[hi]?.weights[ii] ?? 0;
+      const w   = hiddenNodes[hi]?.weights[ii] ?? 0;
       const sig = Math.abs(w * inputVals[ii]);
       const alpha = toHex2(lerp(15, 190, Math.min(sig, 1)));
       const col = w >= 0 ? `#4aaeff${alpha}` : `#ff5544${alpha}`;
@@ -165,7 +173,7 @@ function NetCanvas({ hiddenNodes, outputNodes, inputVals, hiddenActs, outputActs
 
   const hoLines = HIDDEN_YS.flatMap((hy, hi) =>
     OUTPUT_YS.map((oy, oi) => {
-      const w = outputNodes[oi]?.weights[hi] ?? 0;
+      const w   = outputNodes[oi]?.weights[hi] ?? 0;
       const sig = Math.abs(w * hiddenActs[hi]);
       const alpha = toHex2(lerp(15, 190, Math.min(sig, 1)));
       const col = w >= 0 ? `#4aaeff${alpha}` : `#ff5544${alpha}`;
@@ -199,12 +207,12 @@ function NetCanvas({ hiddenNodes, outputNodes, inputVals, hiddenActs, outputActs
       {HIDDEN_YS.map((y, i) => (
         <g key={`h-${i}`}>
           <circle cx={HIDDEN_X} cy={y} r={22}
-            fill={`rgba(120,200,255,${0.05 + hiddenActs[i] * 0.4})`}
-            stroke={`rgba(120,200,255,${0.25 + hiddenActs[i] * 0.65})`} strokeWidth={2} />
+            fill={`rgba(120,200,255,${0.05 + (hiddenActs[i] ?? 0) * 0.4})`}
+            stroke={`rgba(120,200,255,${0.25 + (hiddenActs[i] ?? 0) * 0.65})`} strokeWidth={2} />
           <text x={HIDDEN_X} y={y + 5} textAnchor="middle" fontSize={9}
-            fill={`rgba(140,210,255,${0.4 + hiddenActs[i] * 0.6})`}
+            fill={`rgba(140,210,255,${0.4 + (hiddenActs[i] ?? 0) * 0.6})`}
             fontFamily="'Space Mono',monospace" fontWeight={700}>
-            {hiddenActs[i].toFixed(2)}
+            {(hiddenActs[i] ?? 0).toFixed(2)}
           </text>
         </g>
       ))}
@@ -239,7 +247,9 @@ function NetCanvas({ hiddenNodes, outputNodes, inputVals, hiddenActs, outputActs
 // ════════════════════════════════════════════════════════════
 //  SLIDER (circular)
 // ════════════════════════════════════════════════════════════
-function Slider({ label, value, onChange, color }: { label: string; value: number; onChange: (v: number) => void; color: string }) {
+function Slider({ label, value, onChange, color }: {
+  label: string; value: number; onChange: (v: number) => void; color: string;
+}) {
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
       <div style={{
@@ -292,9 +302,9 @@ function LossChart({ history }: { history: number[] }) {
 //  APP
 // ════════════════════════════════════════════════════════════
 export default function App() {
-  const [inputs, setInputs] = useState<Inputs>({ yellow: 0.5, red: 0.5, rough: 0.5 });
-  const [net, setNet] = useState(() => initNetwork());
-  const [hiddenActs, setHiddenActs] = useState<number[]>([0, 0, 0, 0]);
+  const [inputs, setInputs]         = useState<Inputs>({ yellow: 0.5, red: 0.5, rough: 0.5 });
+  const [net, setNet]               = useState(() => initNetwork());
+  const [hiddenActs, setHiddenActs] = useState<number[]>([0, 0, 0, 0, 0]);
   const [outputActs, setOutputActs] = useState<number[]>([0.25, 0.25, 0.25, 0.25]);
   const [training, setTraining]     = useState(false);
   const [epoch, setEpoch]           = useState(0);
@@ -306,7 +316,6 @@ export default function App() {
   const netRef   = useRef(net);
   netRef.current = net;
 
-  // Forward on input/net change
   useEffect(() => {
     const inp = [inputs.yellow, inputs.red, inputs.rough];
     const { hiddenAct, outputAct } = forward(inp, net.hidden, net.outputs);
@@ -351,20 +360,22 @@ export default function App() {
   }, []);
 
   const stopTraining = useCallback(() => setTraining(false), []);
-  const resetNet     = useCallback(() => {
+
+  const resetNet = useCallback(() => {
     setTraining(false);
     setNet(initNetwork());
-    setEpoch(0); setLossHistory([]); setAccuracy(0);
+    setEpoch(0);
+    setLossHistory([]);
+    setAccuracy(0);
   }, []);
 
   const setInput = useCallback((k: InputKey, v: number) =>
     setInputs(prev => ({ ...prev, [k]: v })), []);
 
-  const winnerIdx = outputActs.indexOf(Math.max(...outputActs));
-  const winner    = FRUIT_META[winnerIdx];
+  const winnerIdx  = outputActs.indexOf(Math.max(...outputActs));
+  const winner     = FRUIT_META[winnerIdx];
   const confidence = outputActs[winnerIdx] ?? 0;
 
-  // ── RENDER ──────────────────────────────────────────────
   return (
     <div style={{
       minHeight: "100vh",
@@ -402,14 +413,14 @@ export default function App() {
         ))}
       </div>
 
-      {/* ── TAB: NETWORK ─────────────────────────────────── */}
+      {/* ── TAB: NETWORK ── */}
       {tab === "network" && (<>
         <div style={{
           position: "relative", width: "min(820px,98vw)",
           background: "rgba(255,255,255,0.018)",
           borderRadius: 20, border: "1px solid rgba(255,255,255,0.055)",
           boxShadow: "0 24px 80px rgba(0,0,0,0.7)",
-          overflow: "hidden", minHeight: 440,
+          overflow: "hidden", minHeight: 480,
         }}>
           <NetCanvas
             hiddenNodes={net.hidden} outputNodes={net.outputs}
@@ -503,18 +514,15 @@ export default function App() {
           ))}
         </div>
 
-        {/* Epoch badge if trained */}
         {epoch > 0 && (
-          <div style={{
-            marginTop: 10, fontSize: 9, color: "#333", letterSpacing: 2,
-          }}>
+          <div style={{ marginTop: 10, fontSize: 9, color: "#333", letterSpacing: 2 }}>
             REDE TREINADA — {epoch} ÉPOCAS · ACURÁCIA {(accuracy * 100).toFixed(0)}%
             {accuracy >= 1 && <span style={{ color: "#44ff88", marginLeft: 8 }}>✓ PERFEITO</span>}
           </div>
         )}
       </>)}
 
-      {/* ── TAB: TRAIN ───────────────────────────────────── */}
+      {/* ── TAB: TRAIN ── */}
       {tab === "train" && (
         <div style={{
           width: "min(820px,98vw)",
@@ -558,7 +566,7 @@ export default function App() {
             <div style={{ fontSize: 9, color: "#2e2e2e", letterSpacing: 2, marginBottom: 10 }}>DATASET DE TREINO</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {TRAIN_DATA.map((s, i) => {
-                const f = FRUIT_META.find(f => f.id === s.label)!;
+                const f = FRUIT_META.find(fr => fr.id === s.label)!;
                 const inp = [s.inputs.yellow, s.inputs.red, s.inputs.rough];
                 const { outputAct } = forward(inp, net.hidden, net.outputs);
                 const correct = FRUIT_META[outputAct.indexOf(Math.max(...outputAct))].id === s.label;
